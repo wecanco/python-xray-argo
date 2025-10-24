@@ -153,13 +153,13 @@ def download_file(file_name, file_url):
 def get_files_for_architecture(architecture):
     if architecture == 'arm':
         base_files = [
-            {"fileName": "web", "fileUrl": "https://arm64.ssss.nyc.mn/web"},
-            {"fileName": "bot", "fileUrl": "https://arm64.ssss.nyc.mn/2go"}
+            {"fileName": "web", "fileUrl": "https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/arm64/web", "oldFileUrl": "https://arm64.ssss.nyc.mn/web"},
+            {"fileName": "bot", "fileUrl": "https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/arm64/2go", "oldFileUrl": "https://arm64.ssss.nyc.mn/2go"}
         ]
     else:
         base_files = [
-            {"fileName": "web", "fileUrl": "https://amd64.ssss.nyc.mn/web"},
-            {"fileName": "bot", "fileUrl": "https://amd64.ssss.nyc.mn/2go"}
+            {"fileName": "web", "fileUrl": "https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/amd64/web", "oldFileUrl": "https://amd64.ssss.nyc.mn/web"},
+            {"fileName": "bot", "fileUrl": "https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/amd64/2go", "oldFileUrl": "https://amd64.ssss.nyc.mn/2go"}
         ]
 
     if NEZHA_SERVER and NEZHA_KEY:
