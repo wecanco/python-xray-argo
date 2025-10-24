@@ -13,33 +13,24 @@ from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Environment variables
-UPLOAD_URL = os.environ.get('UPLOAD_URL',
-                            '')  # Node or subscription upload address, only filling this address will upload nodes, filling PROJECT_URL at the same time will upload subscriptions, for example: https://merge.serv00.net
-PROJECT_URL = os.environ.get('PROJECT_URL',
-                             '')  # Project url, need to fill in for automatic keep-alive or automatic subscription upload, for example: https://www.google.com,
-AUTO_ACCESS = os.environ.get('AUTO_ACCESS',
-                             'false').lower() == 'true'  # false turns off automatic keep-alive, true turns on automatic keep-alive, default is off
+UPLOAD_URL = os.environ.get('UPLOAD_URL', '')  # Node or subscription upload address, only filling this address will upload nodes, filling PROJECT_URL at the same time will upload subscriptions, for example: https://merge.serv00.net
+PROJECT_URL = os.environ.get('PROJECT_URL', '')  # Project url, need to fill in for automatic keep-alive or automatic subscription upload, for example: https://www.google.com,
+AUTO_ACCESS = os.environ.get('AUTO_ACCESS', 'false').lower() == 'true'  # false turns off automatic keep-alive, true turns on automatic keep-alive, default is off
 FILE_PATH = os.environ.get('FILE_PATH', './.cache')  # Running path, sub.txt save path
-SUB_PATH = os.environ.get('SUB_PATH',
-                          'sub')  # Subscription token, default is sub, for example: https://www.google.com/sub
-UUID = os.environ.get('UUID',
-                      '20e6e496-cf19-45c8-b883-14f5e11cd9f1')  # UUID, if using Nezha v1, need to modify when deploying on different platforms, otherwise it will be overwritten
-NEZHA_SERVER = os.environ.get('NEZHA_SERVER',
-                              '')  # Nezha panel domain or ip, v1 format: nezha.xxx.com:8008, v0 format: nezha.xxx.com
-NEZHA_PORT = os.environ.get('NEZHA_PORT',
-                            '')  # Leave empty for v1 Nezha, v0 Nezha agent communication port, automatically matches tls
+SUB_PATH = os.environ.get('SUB_PATH', 'sub')  # Subscription token, default is sub, for example: https://www.google.com/sub
+UUID = os.environ.get('UUID', '20e6e496-cf19-45c8-b883-14f5e11cd9f1')  # UUID, if using Nezha v1, need to modify when deploying on different platforms, otherwise it will be overwritten
+NEZHA_SERVER = os.environ.get('NEZHA_SERVER', '')  # Nezha panel domain or ip, v1 format: nezha.xxx.com:8008, v0 format: nezha.xxx.com
+NEZHA_PORT = os.environ.get('NEZHA_PORT', '')  # Leave empty for v1 Nezha, v0 Nezha agent communication port, automatically matches tls
 NEZHA_KEY = os.environ.get('NEZHA_KEY', '')  # v1 Nezha's NZ_CLIENT_SECRET or v0 Nezha agent key
 ARGO_DOMAIN = os.environ.get('ARGO_DOMAIN', '')  # Argo fixed tunnel domain, leave empty to use temporary tunnel
 ARGO_AUTH = os.environ.get('ARGO_AUTH', '')  # Argo fixed tunnel key, leave empty to use temporary tunnel
-ARGO_PORT = int(os.environ.get('ARGO_PORT',
-                               '8001'))  # Argo port, when using fixed tunnel token, need to set the port in cloudflare backend to be consistent with here
+ARGO_PORT = int(os.environ.get('ARGO_PORT', '8001'))  # Argo port, when using fixed tunnel token, need to set the port in cloudflare backend to be consistent with here
 CFIP = os.environ.get('CFIP', 'www.visa.com.tw')  # Preferred ip or preferred domain
 CFPORT = int(os.environ.get('CFPORT', '443'))  # Preferred ip or preferred domain corresponding port
 NAME = os.environ.get('NAME', 'Vls')  # Node name
 CHAT_ID = os.environ.get('CHAT_ID', '')  # Telegram chat_id, push nodes to tg, both variables need to be filled to push
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # Telegram bot_token
-PORT = int(os.environ.get('SERVER_PORT') or os.environ.get(
-    'PORT') or 3000)  # Subscription port, if unable to subscribe, manually modify to the assigned port
+PORT = int(os.environ.get('SERVER_PORT') or os.environ.get('PORT') or 3000)  # Subscription port, if unable to subscribe, manually modify to the assigned port
 
 
 # Create running folder
