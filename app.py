@@ -489,7 +489,7 @@ def upload_nodes():
 # Send notification to Telegram
 def send_telegram():
     if not BOT_TOKEN or not CHAT_ID:
-        # print('TG variables is empty, Skipping push nodes to TG')
+        print('TG variables is empty, Skipping push nodes to TG')
         return
 
     try:
