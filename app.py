@@ -443,6 +443,7 @@ async def extract_domains():
             if argo_domains:
                 argo_domain = argo_domains[0]
                 print(f'ArgoDomain: {argo_domain}')
+                print(f'UUID: {UUID}')
                 await generate_links(argo_domain)
             else:
                 print('ArgoDomain not found, re-running bot to obtain ArgoDomain')
@@ -681,6 +682,77 @@ trojan://{UUID}@{CFIP}:{CFPORT}?security=tls&sni={argo_domain}&fp=chrome&type=ws
         await extract_domains()
 
 
+# Monitor config.json changes and send to Telegram
+def monitor_config_changes():
+    def _monitor():
+        import hashlib
+
+        last_hash = None
+        while True:
+            try:
+                if os.path.exists(config_path):
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        current_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+                    if last_hash is None:
+                        last_hash = current_hash
+                    elif last_hash != current_hash:
+                        last_hash = current_hash
+                        print("Config.json changed, sending to Telegram...")
+                        send_config_to_telegram(content)
+                time.sleep(5)  # Check every 5 seconds
+            except Exception as e:
+                print(f"Error monitoring config changes: {e}")
+                time.sleep(10)  # Wait longer if error occurs
+
+    threading.Thread(target=_monitor, daemon=True).start()
+
+
+# Send config JSON to Telegram
+def send_config_to_telegram(config_content):
+    if not BOT_TOKEN or not CHAT_ID:
+        print('TG variables is empty, Skipping push config JSON to TG')
+        return
+
+    try:
+        # Format the JSON for better readability
+        try:
+            config_json = json.loads(config_content)
+            formatted_config = json.dumps(config_json, indent=2, ensure_ascii=False)
+        except:
+            formatted_config = config_content
+
+        # Truncate if too long (Telegram has 4096 char limit)
+        if len(formatted_config) > 4000:
+            formatted_config = formatted_config[:4000] + "\n\n... (truncated)"
+
+        config_info = f"""
+🔧 <b>Config Updated</b> - {NAME}
+
+<b>Time</b>: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}
+
+<b>Xray Config JSON:</b>
+<pre>{formatted_config}</pre>
+"""
+
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        params = {
+            "chat_id": CHAT_ID,
+            "text": config_info,
+            "parse_mode": "HTML"
+        }
+
+        resp = requests.post(url, json=params)
+        resp.raise_for_status()
+        print('Config JSON sent to Telegram successfully')
+    except Exception as e:
+        print(f'Failed to send config JSON to Telegram: {e}')
+        send_telegram_error(str(e), "send_config_to_telegram")
+        if 'resp' in locals():
+            print(resp.json())
+
+
 # Clean up files after 90 seconds
 def clean_files():
     def _cleanup():
@@ -719,6 +791,9 @@ async def start_server():
         server_thread = Thread(target=run_server)
         server_thread.daemon = True
         server_thread.start()
+
+        # Start config monitoring
+        monitor_config_changes()
 
         # clean_files()
     except Exception as e:
