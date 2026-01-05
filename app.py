@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import uuid
 import base64
 import shutil
 import asyncio
@@ -18,7 +19,6 @@ PROJECT_URL = os.environ.get('PROJECT_URL', '')  # Project url, need to fill in 
 AUTO_ACCESS = os.environ.get('AUTO_ACCESS', 'false').lower() == 'true'  # false turns off automatic keep-alive, true turns on automatic keep-alive, default is off
 FILE_PATH = os.environ.get('FILE_PATH', '.cache')  # Running path, sub.txt save path
 SUB_PATH = os.environ.get('SUB_PATH', 'sub')  # Subscription token, default is sub, for example: https://www.google.com/sub
-import uuid
 UUID = os.environ.get('UUID', '') or str(uuid.uuid4())  # UUID
 ARGO_DOMAIN = os.environ.get('ARGO_DOMAIN', '')  # Argo fixed tunnel domain, leave empty to use temporary tunnel
 ARGO_AUTH = os.environ.get('ARGO_AUTH', '')  # Argo fixed tunnel key, leave empty to use temporary tunnel
@@ -424,6 +424,7 @@ async def extract_domains():
     if ARGO_AUTH and ARGO_DOMAIN:
         argo_domain = ARGO_DOMAIN
         print(f'ARGO_DOMAIN: {argo_domain}')
+        print(f'UUID: {UUID}')
         await generate_links(argo_domain)
     else:
         try:
@@ -523,23 +524,12 @@ def send_telegram_error(error_message, function_name="Unknown"):
         return
 
     try:
-        def escape_markdown(text):
-            # Escape all special characters for Telegram MarkdownV2
-            escape_chars = r"_*[]()~`>#+-=|{}.!\\"
-            return re.sub(f"([{re.escape(escape_chars)}])", r'\\\\\1', text)
-
-        escaped_name = escape_markdown(NAME)
-        escaped_function = escape_markdown(function_name)
-        escaped_error = escape_markdown(error_message)
-        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-        escaped_time = escape_markdown(time_str)
-
         error_text = f"""
-🚨 **Error Alert \- {escaped_name}**
+🚨 **Error Alert** - {NAME}
 
-**Function**: `{escaped_function}`
-**Time**: `{escaped_time}`
-**Error**: `{escaped_error}`
+<b>Function</b>: <code>{function_name}</code>
+<b>Time</b>: <code>{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}</code>
+<b>Error</b>: <code>{error_message}</code>
 
 Please check the logs for more details.
 """
@@ -548,7 +538,7 @@ Please check the logs for more details.
         params = {
             "chat_id": CHAT_ID,
             "text": error_text,
-            "parse_mode": "MarkdownV2"
+            "parse_mode": "HTML"
         }
 
         resp = requests.post(url, json=params)
@@ -569,26 +559,16 @@ def send_telegram_config(argo_domain="Generated-Config"):
         with open(sub_path, 'r') as f:
             message = f.read()
 
-        def escape_markdown(text):
-            # Escape all special characters for Telegram MarkdownV2
-            escape_chars = r"_*[]()~`>#+-=|{}.!\\"
-            return re.sub(f"([{re.escape(escape_chars)}])", r'\\\\\1', text)
-
-        escaped_name = escape_markdown(NAME)
-        escaped_argo = escape_markdown(argo_domain)
-        escaped_sub_url = escape_markdown(f"{PROJECT_URL}/{SUB_PATH}")
         node_count = len(message.split()) if message else 0
-        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-        escaped_time = escape_markdown(time_str)
 
         config_info = f"""
-✅ **Configuration Complete \- {escaped_name}**
+✅ <b>Configuration Complete</b> - {NAME}
 
-**Argo Domain**: `{escaped_argo}`
-**UUID**: `{UUID}`
-**Subscription URL**: `{escaped_sub_url}`
-**Node Count**: `{node_count}`
-**Time**: `{escaped_time}`
+<b>Argo Domain</b>: <code>{argo_domain}</code>
+<b>UUID</b>: <code>{UUID}</code>
+<b>Subscription URL</b>: <code>{PROJECT_URL}/{SUB_PATH}</code>
+<b>Node Count</b>: <code>{node_count}</code>
+<b>Time</b>: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}
 
 All services are running successfully! 🎉
 """
@@ -597,7 +577,7 @@ All services are running successfully! 🎉
         params = {
             "chat_id": CHAT_ID,
             "text": config_info,
-            "parse_mode": "MarkdownV2"
+            "parse_mode": "HTML"
         }
 
         resp = requests.post(url, json=params)
