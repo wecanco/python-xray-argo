@@ -18,7 +18,7 @@ PROJECT_URL = os.environ.get('PROJECT_URL', '')  # Project url, need to fill in 
 AUTO_ACCESS = os.environ.get('AUTO_ACCESS', 'false').lower() == 'true'  # false turns off automatic keep-alive, true turns on automatic keep-alive, default is off
 FILE_PATH = os.environ.get('FILE_PATH', '.cache')  # Running path, sub.txt save path
 SUB_PATH = os.environ.get('SUB_PATH', 'sub')  # Subscription token, default is sub, for example: https://www.google.com/sub
-UUID = os.environ.get('UUID', '40aadc6a-f7c8-4ad4-bff1-90c08f93f571')  # UUID
+UUID = os.environ.get('UUID', '')  # UUID
 ARGO_DOMAIN = os.environ.get('ARGO_DOMAIN', '')  # Argo fixed tunnel domain, leave empty to use temporary tunnel
 ARGO_AUTH = os.environ.get('ARGO_AUTH', '')  # Argo fixed tunnel key, leave empty to use temporary tunnel
 ARGO_PORT = int(os.environ.get('ARGO_PORT', '8001'))  # Argo port, when using fixed tunnel token, need to set the port in cloudflare backend to be consistent with here
@@ -523,9 +523,9 @@ def send_telegram_error(error_message, function_name="Unknown"):
 
     try:
         def escape_markdown(text):
-            # Escape special characters for Telegram MarkdownV2
-            escape_chars = r'_\*\[\]\(\)~`>#+\-=|{}.!'
-            return re.sub(f"([{escape_chars}])", r'\\\1', text)
+            # Escape all special characters for Telegram MarkdownV2
+            escape_chars = r"_*[]()~`>#+-=|{}.!\\"
+            return re.sub(f"([{re.escape(escape_chars)}])", r'\\\\\1', text)
 
         escaped_name = escape_markdown(NAME)
         escaped_function = escape_markdown(function_name)
@@ -569,9 +569,9 @@ def send_telegram_config(argo_domain="Generated-Config"):
             message = f.read()
 
         def escape_markdown(text):
-            # Escape special characters for Telegram MarkdownV2
-            escape_chars = r'_\*\[\]\(\)~`>#+\-=|{}.!'
-            return re.sub(f"([{escape_chars}])", r'\\\1', text)
+            # Escape all special characters for Telegram MarkdownV2
+            escape_chars = r"_*[]()~`>#+-=|{}.!\\"
+            return re.sub(f"([{re.escape(escape_chars)}])", r'\\\\\1', text)
 
         escaped_name = escape_markdown(NAME)
         escaped_argo = escape_markdown(argo_domain)
@@ -584,6 +584,7 @@ def send_telegram_config(argo_domain="Generated-Config"):
 ✅ **Configuration Complete \- {escaped_name}**
 
 **Argo Domain**: `{escaped_argo}`
+**UUID**: `{UUID}`
 **Subscription URL**: `{escaped_sub_url}`
 **Node Count**: `{node_count}`
 **Time**: `{escaped_time}`
