@@ -80,7 +80,7 @@ def delete_nodes():
         try:
             requests.post(f"{UPLOAD_URL}/api/delete-nodes",
                           data=json.dumps({"nodes": nodes}),
-                          headers={"Content-Type": "application/json"})
+                          headers={"Content-Type": "application/json"}).raise_for_status()
         except Exception as e:
             print(f"Error deleting nodes: {e}")
             # Don't stop the program, just log the error
@@ -480,9 +480,8 @@ def upload_nodes():
                 json=json_data,
                 headers={"Content-Type": "application/json"}
             )
-
-            if response.status_code == 200:
-                print('Subscription uploaded successfully')
+            response.raise_for_status()
+            print('Subscription uploaded successfully')
         except Exception as e:
             print(f'Failed to upload subscription: {e}')
             # Don't stop the program, just log the error
@@ -508,9 +507,8 @@ def upload_nodes():
                 data=json_data,
                 headers={"Content-Type": "application/json"}
             )
-
-            if response.status_code == 200:
-                print('Nodes uploaded successfully')
+            response.raise_for_status()
+            print('Nodes uploaded successfully')
         except Exception as e:
             print(f'Failed to upload nodes: {e}')
             # Don't stop the program, just log the error
@@ -538,10 +536,12 @@ def send_telegram():
             "parse_mode": "MarkdownV2"
         }
 
-        requests.post(url, params=params)
+        resp = requests.post(url, params=params)
+        resp.raise_for_status()
         print('Telegram message sent successfully')
     except Exception as e:
         print(f'Failed to send Telegram message: {e}')
+        print(resp.json())
         # Don't stop the program, just log the error
 
 # Send error notification to Telegram
@@ -570,10 +570,12 @@ Please check the logs for more details.
             "parse_mode": "MarkdownV2"
         }
 
-        requests.post(url, params=params)
+        resp = requests.post(url, params=params)
+        resp.raise_for_status()
         print('Telegram error message sent successfully')
     except Exception as e:
         print(f'Failed to send Telegram error message: {e}')
+        print(resp.json())
 
 # Send configuration information to Telegram
 def send_telegram_config(argo_domain="Generated-Config"):
@@ -610,12 +612,13 @@ All services are running successfully! 🎉
             "parse_mode": "MarkdownV2"
         }
 
-        requests.post(url, params=params)
+        resp = requests.post(url, params=params)
+        resp.raise_for_status()
         print('Telegram configuration message sent successfully')
     except Exception as e:
         print(f'Failed to send Telegram configuration message: {e}')
         send_telegram_error(str(e), "send_telegram_config")
-
+        print(resp.json())
 
 # Generate links and subscription content
 async def generate_links(argo_domain):
