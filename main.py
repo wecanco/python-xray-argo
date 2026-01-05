@@ -5,7 +5,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description='Xray Argo Configuration Manager')
-    parser.add_argument('command', choices=['run', 'send_config'],
+    parser.add_argument('command', nargs='?', choices=['run', 'send_config'], default='run',
                        help='Command to execute: run (default) or send_config')
     
     args = parser.parse_args()

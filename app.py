@@ -16,15 +16,15 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 UPLOAD_URL = os.environ.get('UPLOAD_URL', '')  # Node or subscription upload address, only filling this address will upload nodes, filling PROJECT_URL at the same time will upload subscriptions, for example: https://merge.serv00.net
 PROJECT_URL = os.environ.get('PROJECT_URL', '')  # Project url, need to fill in for automatic keep-alive or automatic subscription upload, for example: https://www.google.com,
 AUTO_ACCESS = os.environ.get('AUTO_ACCESS', 'false').lower() == 'true'  # false turns off automatic keep-alive, true turns on automatic keep-alive, default is off
-FILE_PATH = os.environ.get('FILE_PATH', './.cache')  # Running path, sub.txt save path
+FILE_PATH = os.environ.get('FILE_PATH', '.cache')  # Running path, sub.txt save path
 SUB_PATH = os.environ.get('SUB_PATH', 'sub')  # Subscription token, default is sub, for example: https://www.google.com/sub
 UUID = os.environ.get('UUID', '40aadc6a-f7c8-4ad4-bff1-90c08f93f571')  # UUID
 ARGO_DOMAIN = os.environ.get('ARGO_DOMAIN', '')  # Argo fixed tunnel domain, leave empty to use temporary tunnel
 ARGO_AUTH = os.environ.get('ARGO_AUTH', '')  # Argo fixed tunnel key, leave empty to use temporary tunnel
 ARGO_PORT = int(os.environ.get('ARGO_PORT', '8001'))  # Argo port, when using fixed tunnel token, need to set the port in cloudflare backend to be consistent with here
-CFIP = os.environ.get('CFIP', 'www.visa.com.tw')  # Preferred ip or preferred domain
+CFIP = os.environ.get('CFIP', 'spring.io')  # Preferred ip or preferred domain
 CFPORT = int(os.environ.get('CFPORT', '443'))  # Preferred ip or preferred domain corresponding port
-NAME = os.environ.get('NAME', 'Vls')  # Node name
+NAME = os.environ.get('NAME', '')  # Node name
 CHAT_ID = os.environ.get('CHAT_ID', '')  # Telegram chat_id, push nodes to tg, both variables need to be filled to push
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # Telegram bot_token
 PORT = int(os.environ.get('SERVER_PORT') or os.environ.get('PORT') or 3000)  # Subscription port, if unable to subscribe, manually modify to the assigned port
@@ -622,10 +622,20 @@ async def generate_links(argo_domain):
     try:
         # Get ISP information with error handling
         try:
-            meta_info = subprocess.run(['curl', '-s', 'https://speed.cloudflare.com/meta'],
-                                     capture_output=True, text=True, timeout=10)
-            meta_info = meta_info.stdout.split('"')
-            ISP = f"{meta_info[25]}-{meta_info[17]}".replace(' ', '_').strip()
+            # meta_info = subprocess.run(['curl', '-s', 'https://speed.cloudflare.com/meta'],
+            #                          capture_output=True, text=True, timeout=10)
+            # meta_info = meta_info.stdout.split('"')
+            # ISP = f"{meta_info[25]}-{meta_info[17]}".replace(' ', '_').strip()
+
+            meta_info = subprocess.run(['curl', '-sm', '5', '-H', 'User-Agent: Mozilla/5.0', 'https://api.ip.sb/geoip'], capture_output=True, text=True)
+            geo_data = json.loads(meta_info.stdout)
+            country_code = geo_data.get('country_code', 'Unknown')
+            isp = geo_data.get('isp', 'Unknown').replace(' ', '_').strip()
+
+            if NAME and NAME.strip():
+                ISP = f"{NAME.strip()}-{country_code}_{isp}"
+            else:
+                ISP = f"{country_code}_{isp}"
         except Exception as e:
             print(f"Error getting ISP info: {e}")
             ISP = "Unknown-ISP"
@@ -635,29 +645,29 @@ async def generate_links(argo_domain):
         
         # Generate VMESS configuration
         VMESS = {
-            "v": "2",
-            "ps": f"{NAME}-{ISP}",
-            "add": CFIP,
-            "port": CFPORT,
-            "id": UUID,
-            "aid": "0",
-            "scy": "none",
-            "net": "ws",
-            "type": "none",
-            "host": argo_domain,
-            "path": "/vmess-argo?ed=2560",
-            "tls": "tls",
-            "sni": argo_domain,
-            "alpn": "",
+            "v": "2", 
+            "ps": f"{ISP}", 
+            "add": CFIP, 
+            "port": CFPORT, 
+            "id": UUID, 
+            "aid": "0", 
+            "scy": "none", 
+            "net": "ws", 
+            "type": "none", 
+            "host": argo_domain, 
+            "path": "/vmess-argo?ed=2560", 
+            "tls": "tls", 
+            "sni": argo_domain, 
+            "alpn": "", 
             "fp": "chrome"
         }
 
         # Generate subscription content
-        list_txt = f"""vless://{UUID}@{CFIP}:{CFPORT}?encryption=none&security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Fvless-argo%3Fed%3D2560#{NAME}-{ISP}
+        list_txt = f"""vless://{UUID}@{CFIP}:{CFPORT}?encryption=none&security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Fvless-argo%3Fed%3D2560#{ISP}
 
 vmess://{base64.b64encode(json.dumps(VMESS).encode('utf-8')).decode('utf-8')}
 
-trojan://{UUID}@{CFIP}:{CFPORT}?security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Ftrojan-argo%3Fed%3D2560#{NAME}-{ISP}"""
+trojan://{UUID}@{CFIP}:{CFPORT}?security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Ftrojan-argo%3Fed%3D2560#{ISP}"""
 
         # Save files with error handling
         try:
@@ -745,7 +755,7 @@ async def start_server():
         server_thread.daemon = True
         server_thread.start()
 
-        clean_files()
+        # clean_files()
     except Exception as e:
         print(f"Error in start_server: {e}")
         print("Retrying in 10 seconds...")
@@ -758,7 +768,7 @@ def run_server():
     server = HTTPServer(('0.0.0.0', PORT), RequestHandler)
     print(f"Server is running on port {PORT}")
     print(f"Running done！")
-    print(f"\nLogs will be delete in 90 seconds")
+    # print(f"\nLogs will be delete in 90 seconds")
     server.serve_forever()
 
 
