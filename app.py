@@ -522,14 +522,23 @@ def send_telegram_error(error_message, function_name="Unknown"):
         return
 
     try:
-        escaped_name = re.sub(r'([_*\[\]()~>#+=|{}.!\-])', r'\\\1', NAME)
-        
-        error_text = f"""
-🚨 **Error Alert - {escaped_name}**
+        def escape_markdown(text):
+            # Escape special characters for Telegram MarkdownV2
+            escape_chars = r'_\*\[\]\(\)~`>#+\-=|{}.!'
+            return re.sub(f"([{escape_chars}])", r'\\\1', text)
 
-**Function**: `{function_name}`
-**Time**: `{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}`
-**Error**: `{error_message}`
+        escaped_name = escape_markdown(NAME)
+        escaped_function = escape_markdown(function_name)
+        escaped_error = escape_markdown(error_message)
+        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+        escaped_time = escape_markdown(time_str)
+
+        error_text = f"""
+🚨 **Error Alert \- {escaped_name}**
+
+**Function**: `{escaped_function}`
+**Time**: `{escaped_time}`
+**Error**: `{escaped_error}`
 
 Please check the logs for more details.
 """
@@ -546,7 +555,8 @@ Please check the logs for more details.
         print('Telegram error message sent successfully')
     except Exception as e:
         print(f'Failed to send Telegram error message: {e}')
-        print(resp.json())
+        if 'resp' in locals():
+            print(resp.json())
 
 # Send configuration information to Telegram
 def send_telegram_config(argo_domain="Generated-Config"):
@@ -558,15 +568,25 @@ def send_telegram_config(argo_domain="Generated-Config"):
         with open(sub_path, 'r') as f:
             message = f.read()
 
-        escaped_name = re.sub(r'([_*\[\]()~`>#+\-=|{}.!\-])', r'\\\1', NAME)
-        
-        config_info = f"""
-✅ **Configuration Complete - {escaped_name}**
+        def escape_markdown(text):
+            # Escape special characters for Telegram MarkdownV2
+            escape_chars = r'_\*\[\]\(\)~`>#+\-=|{}.!'
+            return re.sub(f"([{escape_chars}])", r'\\\1', text)
 
-**Argo Domain**: `{argo_domain}`
-**Subscription URL**: `{PROJECT_URL}/{SUB_PATH}`
-**Node Count**: `{len(message.split()) if message else 0}`
-**Time**: `{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}`
+        escaped_name = escape_markdown(NAME)
+        escaped_argo = escape_markdown(argo_domain)
+        escaped_sub_url = escape_markdown(f"{PROJECT_URL}/{SUB_PATH}")
+        node_count = len(message.split()) if message else 0
+        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+        escaped_time = escape_markdown(time_str)
+
+        config_info = f"""
+✅ **Configuration Complete \- {escaped_name}**
+
+**Argo Domain**: `{escaped_argo}`
+**Subscription URL**: `{escaped_sub_url}`
+**Node Count**: `{node_count}`
+**Time**: `{escaped_time}`
 
 All services are running successfully! 🎉
 """
@@ -584,7 +604,8 @@ All services are running successfully! 🎉
     except Exception as e:
         print(f'Failed to send Telegram configuration message: {e}')
         send_telegram_error(str(e), "send_telegram_config")
-        print(resp.json())
+        if 'resp' in locals():
+            print(resp.json())
 
 # Generate links and subscription content
 async def generate_links(argo_domain):
