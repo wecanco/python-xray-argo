@@ -541,7 +541,7 @@ Please check the logs for more details.
             "parse_mode": "MarkdownV2"
         }
 
-        resp = requests.post(url, params=params)
+        resp = requests.post(url, json=params)
         resp.raise_for_status()
         print('Telegram error message sent successfully')
     except Exception as e:
@@ -578,7 +578,7 @@ All services are running successfully! 🎉
             "parse_mode": "MarkdownV2"
         }
 
-        resp = requests.post(url, params=params)
+        resp = requests.post(url, json=params)
         resp.raise_for_status()
         print('Telegram configuration message sent successfully')
     except Exception as e:
