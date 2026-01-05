@@ -18,7 +18,8 @@ PROJECT_URL = os.environ.get('PROJECT_URL', '')  # Project url, need to fill in 
 AUTO_ACCESS = os.environ.get('AUTO_ACCESS', 'false').lower() == 'true'  # false turns off automatic keep-alive, true turns on automatic keep-alive, default is off
 FILE_PATH = os.environ.get('FILE_PATH', '.cache')  # Running path, sub.txt save path
 SUB_PATH = os.environ.get('SUB_PATH', 'sub')  # Subscription token, default is sub, for example: https://www.google.com/sub
-UUID = os.environ.get('UUID', '')  # UUID
+import uuid
+UUID = os.environ.get('UUID', '') or str(uuid.uuid4())  # UUID
 ARGO_DOMAIN = os.environ.get('ARGO_DOMAIN', '')  # Argo fixed tunnel domain, leave empty to use temporary tunnel
 ARGO_AUTH = os.environ.get('ARGO_AUTH', '')  # Argo fixed tunnel key, leave empty to use temporary tunnel
 ARGO_PORT = int(os.environ.get('ARGO_PORT', '8001'))  # Argo port, when using fixed tunnel token, need to set the port in cloudflare backend to be consistent with here
@@ -319,7 +320,7 @@ async def download_files_and_run():
         # Download all files
         download_success = True
         for file_info in files_to_download:
-            print(f"Downloading {file_info['fileName']} ({file_info["fileUrl"]}) ...")
+            print(f"Downloading {file_info['fileName']} ({file_info['fileUrl']}) ...")
             if not download_file(file_info["fileName"], file_info["fileUrl"]):
                 download_success = False
                 print(f"Failed to download {file_info['fileName']}")
