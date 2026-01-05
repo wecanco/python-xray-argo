@@ -515,35 +515,6 @@ def upload_nodes():
     else:
         return
 
-
-# Send notification to Telegram
-def send_telegram():
-    if not BOT_TOKEN or not CHAT_ID:
-        print('TG variables is empty, Skipping push nodes to TG')
-        return
-
-    try:
-        with open(sub_path, 'r') as f:
-            message = f.read()
-
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-
-        escaped_name = re.sub(r'([_*\[\]()~>#+=|{}.!\-])', r'\\\1', NAME)
-
-        params = {
-            "chat_id": CHAT_ID,
-            "text": f"**{escaped_name}节点推送通知**\n{message}",
-            "parse_mode": "MarkdownV2"
-        }
-
-        resp = requests.post(url, params=params)
-        resp.raise_for_status()
-        print('Telegram message sent successfully')
-    except Exception as e:
-        print(f'Failed to send Telegram message: {e}')
-        print(resp.json())
-        # Don't stop the program, just log the error
-
 # Send error notification to Telegram
 def send_telegram_error(error_message, function_name="Unknown"):
     if not BOT_TOKEN or not CHAT_ID:
@@ -587,7 +558,7 @@ def send_telegram_config(argo_domain="Generated-Config"):
         with open(sub_path, 'r') as f:
             message = f.read()
 
-        escaped_name = re.sub(r'([_*\[\]()~>#+=|{}.!\-])', r'\\\1', NAME)
+        escaped_name = re.sub(r'([_*\[\]()~`>#+\-=|{}.!\-])', r'\\\1', NAME)
         
         config_info = f"""
 ✅ **Configuration Complete - {escaped_name}**
@@ -596,11 +567,6 @@ def send_telegram_config(argo_domain="Generated-Config"):
 **Subscription URL**: `{PROJECT_URL}/{SUB_PATH}`
 **Node Count**: `{len(message.split()) if message else 0}`
 **Time**: `{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}`
-
-**Subscription Links:**
-```
-{message}
-```
 
 All services are running successfully! 🎉
 """
@@ -690,13 +656,6 @@ trojan://{UUID}@{CFIP}:{CFPORT}?security=tls&sni={argo_domain}&fp=chrome&type=ws
 
         print(f"Generated {len(list_txt.split())} nodes")
         print(f"{FILE_PATH}/sub.txt saved successfully")
-
-        # Additional actions with error handling
-        try:
-            send_telegram()
-        except Exception as e:
-            print(f"Error sending Telegram: {e}")
-            send_telegram_error(str(e), "generate_links")
 
         try:
             upload_nodes()
