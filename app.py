@@ -576,7 +576,7 @@ Please check the logs for more details.
         print(f'Failed to send Telegram error message: {e}')
 
 # Send configuration information to Telegram
-def send_telegram_config(argo_domain):
+def send_telegram_config(argo_domain="Generated-Config"):
     if not BOT_TOKEN or not CHAT_ID:
         print('TG variables is empty, Skipping push config to TG')
         return
@@ -787,10 +787,35 @@ def run_async():
 
 
 if __name__ == "__main__":
-    while True:
+    import sys
+    
+    # Check if send_config command is provided
+    if len(sys.argv) > 1 and sys.argv[1] == 'send_config':
+        if not BOT_TOKEN or not CHAT_ID:
+            print('Error: BOT_TOKEN and CHAT_ID environment variables must be set for send_config command')
+            sys.exit(1)
+        
+        # Check if sub.txt exists
+        if not os.path.exists(sub_path):
+            print('Error: Configuration file not found. Please run the application first to generate configuration.')
+            sys.exit(1)
+        
         try:
-            run_async()
+            with open(sub_path, 'r') as f:
+                config_content = f.read()
+            
+            # Send configuration to Telegram
+            send_telegram_config("Generated-Config")
+            print('Configuration sent to Telegram successfully!')
+            
         except Exception as e:
-            print(f"Error in main loop: {e}")
-            print("Restarting in 10 seconds...")
-            time.sleep(10)
+            print(f'Error sending configuration: {e}')
+            sys.exit(1)
+    else:
+        while True:
+            try:
+                run_async()
+            except Exception as e:
+                print(f"Error in main loop: {e}")
+                print("Restarting in 10 seconds...")
+                time.sleep(10)

@@ -10,8 +10,7 @@ tunnel.yml
 sub.txt
 list.txt
 
-# Ignore cache directory
 .cache/
 
-#Ignore cursor AI rules
 /.cursor
+/__pycache__
