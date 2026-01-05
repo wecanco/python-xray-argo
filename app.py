@@ -18,10 +18,7 @@ PROJECT_URL = os.environ.get('PROJECT_URL', '')  # Project url, need to fill in 
 AUTO_ACCESS = os.environ.get('AUTO_ACCESS', 'false').lower() == 'true'  # false turns off automatic keep-alive, true turns on automatic keep-alive, default is off
 FILE_PATH = os.environ.get('FILE_PATH', './.cache')  # Running path, sub.txt save path
 SUB_PATH = os.environ.get('SUB_PATH', 'sub')  # Subscription token, default is sub, for example: https://www.google.com/sub
-UUID = os.environ.get('UUID', '20e6e496-cf19-45c8-b883-14f5e11cd9f1')  # UUID, if using Nezha v1, need to modify when deploying on different platforms, otherwise it will be overwritten
-NEZHA_SERVER = os.environ.get('NEZHA_SERVER', '')  # Nezha panel domain or ip, v1 format: nezha.xxx.com:8008, v0 format: nezha.xxx.com
-NEZHA_PORT = os.environ.get('NEZHA_PORT', '')  # Leave empty for v1 Nezha, v0 Nezha agent communication port, automatically matches tls
-NEZHA_KEY = os.environ.get('NEZHA_KEY', '')  # v1 Nezha's NZ_CLIENT_SECRET or v0 Nezha agent key
+UUID = os.environ.get('UUID', '40aadc6a-f7c8-4ad4-bff1-90c08f93f571')  # UUID
 ARGO_DOMAIN = os.environ.get('ARGO_DOMAIN', '')  # Argo fixed tunnel domain, leave empty to use temporary tunnel
 ARGO_AUTH = os.environ.get('ARGO_AUTH', '')  # Argo fixed tunnel key, leave empty to use temporary tunnel
 ARGO_PORT = int(os.environ.get('ARGO_PORT', '8001'))  # Argo port, when using fixed tunnel token, need to set the port in cloudflare backend to be consistent with here
@@ -35,12 +32,16 @@ PORT = int(os.environ.get('SERVER_PORT') or os.environ.get('PORT') or 3000)  # S
 
 # Create running folder
 def create_directory():
-    print('\033c', end='')
-    if not os.path.exists(FILE_PATH):
-        os.makedirs(FILE_PATH)
-        print(f"{FILE_PATH} is created")
-    else:
-        print(f"{FILE_PATH} already exists")
+    try:
+        print('\033c', end='')
+        if not os.path.exists(FILE_PATH):
+            os.makedirs(FILE_PATH)
+            print(f"{FILE_PATH} is created")
+        else:
+            print(f"{FILE_PATH} already exists")
+    except Exception as e:
+        print(f"Error creating directory {FILE_PATH}: {e}")
+        # Don't stop the program, just log the error
 
 
 # Global variables
@@ -80,11 +81,12 @@ def delete_nodes():
             requests.post(f"{UPLOAD_URL}/api/delete-nodes",
                           data=json.dumps({"nodes": nodes}),
                           headers={"Content-Type": "application/json"})
-        except:
-            return None
+        except Exception as e:
+            print(f"Error deleting nodes: {e}")
+            # Don't stop the program, just log the error
     except Exception as e:
         print(f"Error in delete_nodes: {e}")
-        return None
+        # Don't stop the program, just log the error
 
 
 # Clean up old files
@@ -100,6 +102,7 @@ def cleanup_old_files():
                     os.remove(file_path)
         except Exception as e:
             print(f"Error removing {file_path}: {e}")
+            # Don't stop the program, just log the error
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -131,10 +134,15 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 # Determine system architecture
 def get_system_architecture():
-    architecture = platform.machine().lower()
-    if 'arm' in architecture or 'aarch64' in architecture:
-        return 'arm'
-    else:
+    try:
+        architecture = platform.machine().lower()
+        if 'arm' in architecture or 'aarch64' in architecture:
+            return 'arm'
+        else:
+            return 'amd'
+    except Exception as e:
+        print(f"Error determining system architecture: {e}")
+        # Default to amd if detection fails
         return 'amd'
 
 
@@ -145,11 +153,51 @@ def download_file(file_name, file_url):
         response = requests.get(file_url, stream=True)
         response.raise_for_status()
 
-        with open(file_path, 'wb') as f:
+        # Handle zip files
+        if file_url.endswith('.zip'):
+            import zipfile
+            import io
+            
+            # Download to memory first
+            zip_content = io.BytesIO()
             for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+                zip_content.write(chunk)
+            zip_content.seek(0)
+            
+            # Extract zip file
+            with zipfile.ZipFile(zip_content, 'r') as zip_ref:
+                # Extract all files
+                zip_ref.extractall(FILE_PATH)
+                
+                # Find the main executable file
+                extracted_files = zip_ref.namelist()
+                target_file = None
+                
+                for extracted_file in extracted_files:
+                    if file_name == 'web' and 'xray' in extracted_file and not extracted_file.endswith(('.dat', '.md', '.txt', '.json')):
+                        target_file = extracted_file
+                        break
+                    elif file_name == 'bot' and 'cloudflared' in extracted_file and extracted_file.endswith(('.linux', '.darwin', '.windows')):
+                        target_file = extracted_file
+                        break
+                
+                if target_file:
+                    extracted_path = os.path.join(FILE_PATH, target_file)
+                    # Rename to expected filename
+                    os.rename(extracted_path, file_path)
+                    print(f"Download and extract {file_name} successfully")
+                else:
+                    print(f"Could not find target file in {file_name} zip | path: {file_path}")
+                    return False
+                        
+        else:
+            # Handle regular files
+            with open(file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            print(f"Download {file_name} successfully")
 
-        print(f"Download {file_name} successfully")
         return True
     except Exception as e:
         if os.path.exists(file_path):
@@ -160,35 +208,26 @@ def download_file(file_name, file_url):
 
 # Get files for architecture
 def get_files_for_architecture(architecture):
-    base_files = [
-        {"fileName": "web",
-         "fileUrl": f"https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/base/{architecture}64/web"},
-        {"fileName": "bot",
-         "fileUrl": f"https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/base/{architecture}64/2go"}
-    ]
-
-    # if architecture == 'arm':
-    #     base_files = [
-    #         {"fileName": "web", "fileUrl": "https://arm64.ssss.nyc.mn/web"},
-    #         {"fileName": "bot", "fileUrl": "https://arm64.ssss.nyc.mn/2go"}
-    #     ]
-    # else:
-    #     base_files = [
-    #         {"fileName": "web", "fileUrl": "https://amd64.ssss.nyc.mn/web"},
-    #         {"fileName": "bot", "fileUrl": "https://amd64.ssss.nyc.mn/2go"}
-    #     ]
-
-    if NEZHA_SERVER and NEZHA_KEY:
-        if NEZHA_PORT:
-            # npm_url = "https://arm64.ssss.nyc.mn/agent" if architecture == 'arm' else "https://amd64.ssss.nyc.mn/agent"
-            npm_url = f"https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/npm/{architecture}64/agent"
-            base_files.insert(0, {"fileName": "npm", "fileUrl": npm_url})
+    try:
+        base_files = []
+        
+        # Xray binary URLs
+        if architecture == 'arm':
+            base_files.append({"fileName": "web", "fileUrl": "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-arm64-v8a.zip"})
         else:
-            # php_url = "https://arm64.ssss.nyc.mn/v1" if architecture == 'arm' else "https://amd64.ssss.nyc.mn/v1"
-            php_url = f"https://raw.githubusercontent.com/wecanco/python-xray-argo/refs/heads/main/lib/php/{architecture}64/v1"
-            base_files.insert(0, {"fileName": "php", "fileUrl": php_url})
+            base_files.append({"fileName": "web", "fileUrl": "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip"})
+        
+        # Cloudflared binary URLs
+        if architecture == 'arm':
+            base_files.append({"fileName": "bot", "fileUrl": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"})
+        else:
+            base_files.append({"fileName": "bot", "fileUrl": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"})
 
-    return base_files
+        return base_files
+    except Exception as e:
+        print(f"Error getting files for architecture {architecture}: {e}")
+        # Return empty list if error occurs
+        return []
 
 
 # Authorize files with execute permission
@@ -197,24 +236,26 @@ def authorize_files(file_paths):
         absolute_file_path = os.path.join(FILE_PATH, relative_file_path)
         if os.path.exists(absolute_file_path):
             try:
-                os.chmod(absolute_file_path, 0o775)
-                print(f"Empowerment success for {absolute_file_path}: 775")
+                os.chmod(absolute_file_path, 0o755)
+                print(f"Made {absolute_file_path} executable")
             except Exception as e:
-                print(f"Empowerment failed for {absolute_file_path}: {e}")
+                print(f"Failed to make {absolute_file_path} executable: {e}")
+                # Don't stop the program, just log the error
 
 
 # Configure Argo tunnel
 def argo_type():
-    if not ARGO_AUTH or not ARGO_DOMAIN:
-        print("ARGO_DOMAIN or ARGO_AUTH variable is empty, use quick tunnels")
-        return
+    try:
+        if not ARGO_AUTH or not ARGO_DOMAIN:
+            print("ARGO_DOMAIN or ARGO_AUTH variable is empty, use quick tunnels")
+            return
 
-    if "TunnelSecret" in ARGO_AUTH:
-        with open(os.path.join(FILE_PATH, 'tunnel.json'), 'w') as f:
-            f.write(ARGO_AUTH)
+        if "TunnelSecret" in ARGO_AUTH:
+            with open(os.path.join(FILE_PATH, 'tunnel.json'), 'w') as f:
+                f.write(ARGO_AUTH)
 
-        tunnel_id = ARGO_AUTH.split('"')[11]
-        tunnel_yml = f"""
+            tunnel_id = ARGO_AUTH.split('"')[11]
+            tunnel_yml = f"""
 tunnel: {tunnel_id}
 credentials-file: {os.path.join(FILE_PATH, 'tunnel.json')}
 protocol: http2
@@ -226,10 +267,13 @@ ingress:
       noTLSVerify: true
   - service: http_status:404
 """
-        with open(os.path.join(FILE_PATH, 'tunnel.yml'), 'w') as f:
-            f.write(tunnel_yml)
-    else:
-        print("Use token connect to tunnel,please set the {ARGO_PORT} in cloudflare")
+            with open(os.path.join(FILE_PATH, 'tunnel.yml'), 'w') as f:
+                f.write(tunnel_yml)
+        else:
+            print("Use token connect to tunnel,please set the {ARGO_PORT} in cloudflare")
+    except Exception as e:
+        print(f"Error configuring Argo tunnel: {e}")
+        # Don't stop the program, just log the error
 
 
 # Execute shell command and return output
@@ -258,56 +302,47 @@ async def download_files_and_run():
 
     if not files_to_download:
         print("Can't find a file for the current architecture")
-        return
+        await asyncio.sleep(10)
+        return await download_files_and_run()
 
-    # Download all files
-    download_success = True
+    print(f"Downloading binaries for {architecture}64 architecture...")
+    
+    # Check if files already exist to avoid re-downloading
+    all_files_exist = True
     for file_info in files_to_download:
-        if not download_file(file_info["fileName"], file_info["fileUrl"]):
-            download_success = False
+        file_path = os.path.join(FILE_PATH, file_info["fileName"])
+        if not os.path.exists(file_path):
+            all_files_exist = False
+            break
+    
+    if not all_files_exist:
+        # Download all files
+        download_success = True
+        for file_info in files_to_download:
+            print(f"Downloading {file_info['fileName']} ({file_info["fileUrl"]}) ...")
+            if not download_file(file_info["fileName"], file_info["fileUrl"]):
+                download_success = False
+                print(f"Failed to download {file_info['fileName']}")
 
-    if not download_success:
-        print("Error downloading files")
-        return
+        if not download_success:
+            print("Error downloading files, retrying in 10 seconds...")
+            await asyncio.sleep(10)
+            return await download_files_and_run()
+    else:
+        print("All required files already exist, skipping download")
+        
+    # Verify all required files are downloaded
+    required_files = ['web', 'bot']
+    for required_file in required_files:
+        required_path = os.path.join(FILE_PATH, required_file)
+        if not os.path.exists(required_path):
+            print(f"Required file {required_file} not found")
+            await asyncio.sleep(10)
+            return await download_files_and_run()
 
     # Authorize files
-    files_to_authorize = ['npm', 'web', 'bot'] if NEZHA_PORT else ['php', 'web', 'bot']
+    files_to_authorize = ['web', 'bot']
     authorize_files(files_to_authorize)
-
-    # Check TLS
-    port = NEZHA_SERVER.split(":")[-1] if ":" in NEZHA_SERVER else ""
-    if port in ["443", "8443", "2096", "2087", "2083", "2053"]:
-        nezha_tls = "true"
-    else:
-        nezha_tls = "false"
-
-    # Configure nezha
-    if NEZHA_SERVER and NEZHA_KEY:
-        if not NEZHA_PORT:
-            # Generate config.yaml for v1
-            config_yaml = f"""
-client_secret: {NEZHA_KEY}
-debug: false
-disable_auto_update: true
-disable_command_execute: false
-disable_force_update: true
-disable_nat: false
-disable_send_query: false
-gpu: false
-insecure_tls: false
-ip_report_period: 1800
-report_delay: 4
-server: {NEZHA_SERVER}
-skip_connection_count: false
-skip_procs_count: false
-temperature: false
-tls: {nezha_tls}
-use_gitee_to_upgrade: false
-use_ipv6_country_code: false
-uuid: {UUID}"""
-
-            with open(os.path.join(FILE_PATH, 'config.yaml'), 'w') as f:
-                f.write(config_yaml)
 
     # Generate configuration file
     config = {"log": {"access": "/dev/null", "error": "/dev/null", "loglevel": "none", }, "inbounds": [
@@ -333,55 +368,47 @@ uuid: {UUID}"""
     with open(os.path.join(FILE_PATH, 'config.json'), 'w', encoding='utf-8') as config_file:
         json.dump(config, config_file, ensure_ascii=False, indent=2)
 
-    # Run nezha
-    if NEZHA_SERVER and NEZHA_PORT and NEZHA_KEY:
-        tls_ports = ['443', '8443', '2096', '2087', '2083', '2053']
-        nezha_tls = '--tls' if NEZHA_PORT in tls_ports else ''
-        command = f"nohup {os.path.join(FILE_PATH, 'npm')} -s {NEZHA_SERVER}:{NEZHA_PORT} -p {NEZHA_KEY} {nezha_tls} >/dev/null 2>&1 &"
-
-        try:
-            exec_cmd(command)
-            print('npm is running')
-            time.sleep(1)
-        except Exception as e:
-            print(f"npm running error: {e}")
-
-    elif NEZHA_SERVER and NEZHA_KEY:
-        # Run V1
-        command = f"nohup {FILE_PATH}/php -c \"{FILE_PATH}/config.yaml\" >/dev/null 2>&1 &"
-        try:
-            exec_cmd(command)
-            print('php is running')
-            time.sleep(1)
-        except Exception as e:
-            print(f"php running error: {e}")
-    else:
-        print('NEZHA variable is empty, skipping running')
 
     # Run sbX
-    command = f"nohup {os.path.join(FILE_PATH, 'web')} -c {os.path.join(FILE_PATH, 'config.json')} >/dev/null 2>&1 &"
-    try:
-        exec_cmd(command)
-        print('web is running')
-        time.sleep(1)
-    except Exception as e:
-        print(f"web running error: {e}")
+    web_path = os.path.join(FILE_PATH, 'web')
+    if os.path.exists(web_path):
+        # Make executable if needed
+        os.chmod(web_path, 0o755)
+        command = f"nohup {web_path} -c {os.path.join(FILE_PATH, 'config.json')} >/dev/null 2>&1 &"
+        try:
+            exec_cmd(command)
+            print('web is running')
+            time.sleep(1)
+        except Exception as e:
+            print(f"web running error: {e}")
+    else:
+        print("Web binary not found, skipping Xray server")
 
     # Run cloudflared
-    if os.path.exists(os.path.join(FILE_PATH, 'bot')):
+    bot_path = os.path.join(FILE_PATH, 'bot')
+    if os.path.exists(bot_path):
+        # Make executable if needed
+        os.chmod(bot_path, 0o755)
         if re.match(r'^[A-Z0-9a-z=]{120,250}$', ARGO_AUTH):
             args = f"tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token {ARGO_AUTH}"
         elif "TunnelSecret" in ARGO_AUTH:
             args = f"tunnel --edge-ip-version auto --config {os.path.join(FILE_PATH, 'tunnel.yml')} run"
         else:
-            args = f"tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile {os.path.join(FILE_PATH, 'boot.log')} --loglevel info --url http://localhost:{ARGO_PORT}"
+            args = f"tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile {FILE_PATH}/boot.log --loglevel info --url http://localhost:{ARGO_PORT}"
 
         try:
-            exec_cmd(f"nohup {os.path.join(FILE_PATH, 'bot')} {args} >/dev/null 2>&1 &")
+            exec_cmd(f"nohup {bot_path} {args} >/dev/null 2>&1 &")
             print('bot is running')
             time.sleep(2)
         except Exception as e:
             print(f"Error executing command: {e}")
+            # If cloudflared fails, wait and retry
+            await asyncio.sleep(10)
+            return await download_files_and_run()
+    else:
+        print("Bot binary not found, skipping cloudflared")
+        await asyncio.sleep(10)
+        return await download_files_and_run()
 
     time.sleep(5)
 
@@ -434,6 +461,9 @@ async def extract_domains():
                 await extract_domains()  # Try again
         except Exception as e:
             print(f'Error reading boot.log: {e}')
+            # Wait and retry
+            await asyncio.sleep(10)
+            await extract_domains()
 
 
 # Upload nodes to subscription service
@@ -454,7 +484,8 @@ def upload_nodes():
             if response.status_code == 200:
                 print('Subscription uploaded successfully')
         except Exception as e:
-            pass
+            print(f'Failed to upload subscription: {e}')
+            # Don't stop the program, just log the error
 
     elif UPLOAD_URL:
         if not os.path.exists(list_path):
@@ -480,8 +511,9 @@ def upload_nodes():
 
             if response.status_code == 200:
                 print('Nodes uploaded successfully')
-        except:
-            return None
+        except Exception as e:
+            print(f'Failed to upload nodes: {e}')
+            # Don't stop the program, just log the error
     else:
         return
 
@@ -510,104 +542,216 @@ def send_telegram():
         print('Telegram message sent successfully')
     except Exception as e:
         print(f'Failed to send Telegram message: {e}')
+        # Don't stop the program, just log the error
+
+# Send error notification to Telegram
+def send_telegram_error(error_message, function_name="Unknown"):
+    if not BOT_TOKEN or not CHAT_ID:
+        print('TG variables is empty, Skipping push error to TG')
+        return
+
+    try:
+        escaped_name = re.sub(r'([_*\[\]()~>#+=|{}.!\-])', r'\\\1', NAME)
+        
+        error_text = f"""
+🚨 **Error Alert - {escaped_name}**
+
+**Function**: `{function_name}`
+**Time**: `{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}`
+**Error**: `{error_message}`
+
+Please check the logs for more details.
+"""
+
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        params = {
+            "chat_id": CHAT_ID,
+            "text": error_text,
+            "parse_mode": "MarkdownV2"
+        }
+
+        requests.post(url, params=params)
+        print('Telegram error message sent successfully')
+    except Exception as e:
+        print(f'Failed to send Telegram error message: {e}')
+
+# Send configuration information to Telegram
+def send_telegram_config(argo_domain):
+    if not BOT_TOKEN or not CHAT_ID:
+        print('TG variables is empty, Skipping push config to TG')
+        return
+
+    try:
+        with open(sub_path, 'r') as f:
+            message = f.read()
+
+        escaped_name = re.sub(r'([_*\[\]()~>#+=|{}.!\-])', r'\\\1', NAME)
+        
+        config_info = f"""
+✅ **Configuration Complete - {escaped_name}**
+
+**Argo Domain**: `{argo_domain}`
+**Subscription URL**: `{PROJECT_URL}/{SUB_PATH}`
+**Node Count**: `{len(message.split()) if message else 0}`
+**Time**: `{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}`
+
+**Subscription Links:**
+```
+{message}
+```
+
+All services are running successfully! 🎉
+"""
+
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        params = {
+            "chat_id": CHAT_ID,
+            "text": config_info,
+            "parse_mode": "MarkdownV2"
+        }
+
+        requests.post(url, params=params)
+        print('Telegram configuration message sent successfully')
+    except Exception as e:
+        print(f'Failed to send Telegram configuration message: {e}')
+        send_telegram_error(str(e), "send_telegram_config")
 
 
 # Generate links and subscription content
 async def generate_links(argo_domain):
-    meta_info = subprocess.run(['curl', '-s', 'https://speed.cloudflare.com/meta'], capture_output=True, text=True)
-    meta_info = meta_info.stdout.split('"')
-    ISP = f"{meta_info[25]}-{meta_info[17]}".replace(' ', '_').strip()
+    try:
+        # Get ISP information with error handling
+        try:
+            meta_info = subprocess.run(['curl', '-s', 'https://speed.cloudflare.com/meta'],
+                                     capture_output=True, text=True, timeout=10)
+            meta_info = meta_info.stdout.split('"')
+            ISP = f"{meta_info[25]}-{meta_info[17]}".replace(' ', '_').strip()
+        except Exception as e:
+            print(f"Error getting ISP info: {e}")
+            ISP = "Unknown-ISP"
+            # Use default ISP if curl fails
 
-    time.sleep(2)
-    VMESS = {"v": "2", "ps": f"{NAME}-{ISP}", "add": CFIP, "port": CFPORT, "id": UUID, "aid": "0", "scy": "none",
-             "net": "ws", "type": "none", "host": argo_domain, "path": "/vmess-argo?ed=2560", "tls": "tls",
-             "sni": argo_domain, "alpn": "", "fp": "chrome"}
+        time.sleep(2)
+        
+        # Generate VMESS configuration
+        VMESS = {
+            "v": "2",
+            "ps": f"{NAME}-{ISP}",
+            "add": CFIP,
+            "port": CFPORT,
+            "id": UUID,
+            "aid": "0",
+            "scy": "none",
+            "net": "ws",
+            "type": "none",
+            "host": argo_domain,
+            "path": "/vmess-argo?ed=2560",
+            "tls": "tls",
+            "sni": argo_domain,
+            "alpn": "",
+            "fp": "chrome"
+        }
 
-    list_txt = f"""
-vless://{UUID}@{CFIP}:{CFPORT}?encryption=none&security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Fvless-argo%3Fed%3D2560#{NAME}-{ISP}
-  
+        # Generate subscription content
+        list_txt = f"""vless://{UUID}@{CFIP}:{CFPORT}?encryption=none&security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Fvless-argo%3Fed%3D2560#{NAME}-{ISP}
+
 vmess://{base64.b64encode(json.dumps(VMESS).encode('utf-8')).decode('utf-8')}
 
-trojan://{UUID}@{CFIP}:{CFPORT}?security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Ftrojan-argo%3Fed%3D2560#{NAME}-{ISP}
-    """
+trojan://{UUID}@{CFIP}:{CFPORT}?security=tls&sni={argo_domain}&fp=chrome&type=ws&host={argo_domain}&path=%2Ftrojan-argo%3Fed%3D2560#{NAME}-{ISP}"""
 
-    with open(os.path.join(FILE_PATH, 'list.txt'), 'w', encoding='utf-8') as list_file:
-        list_file.write(list_txt)
+        # Save files with error handling
+        try:
+            with open(os.path.join(FILE_PATH, 'list.txt'), 'w', encoding='utf-8') as list_file:
+                list_file.write(list_txt)
+        except Exception as e:
+            print(f"Error writing list.txt: {e}")
+            return None
 
-    sub_txt = base64.b64encode(list_txt.encode('utf-8')).decode('utf-8')
-    with open(os.path.join(FILE_PATH, 'sub.txt'), 'w', encoding='utf-8') as sub_file:
-        sub_file.write(sub_txt)
+        sub_txt = base64.b64encode(list_txt.encode('utf-8')).decode('utf-8')
+        try:
+            with open(os.path.join(FILE_PATH, 'sub.txt'), 'w', encoding='utf-8') as sub_file:
+                sub_file.write(sub_txt)
+        except Exception as e:
+            print(f"Error writing sub.txt: {e}")
+            return None
 
-    print(sub_txt)
+        print(f"Generated {len(list_txt.split())} nodes")
+        print(f"{FILE_PATH}/sub.txt saved successfully")
 
-    print(f"{FILE_PATH}/sub.txt saved successfully")
+        # Additional actions with error handling
+        try:
+            send_telegram()
+        except Exception as e:
+            print(f"Error sending Telegram: {e}")
+            send_telegram_error(str(e), "generate_links")
 
-    # Additional actions
-    send_telegram()
-    upload_nodes()
+        try:
+            upload_nodes()
+        except Exception as e:
+            print(f"Error uploading nodes: {e}")
 
-    return sub_txt
+        try:
+            send_telegram_config(argo_domain)
+        except Exception as e:
+            print(f"Error sending config to Telegram: {e}")
+            send_telegram_error(str(e), "generate_links")
 
-
-# Add automatic access task
-def add_visit_task():
-    if not AUTO_ACCESS or not PROJECT_URL:
-        print("Skipping adding automatic access task")
-        return
-
-    try:
-        response = requests.post(
-            'https://keep.gvrander.eu.org/add-url',
-            json={"url": PROJECT_URL},
-            headers={"Content-Type": "application/json"}
-        )
-        print('automatic access task added successfully')
+        return sub_txt
     except Exception as e:
-        print(f'Failed to add URL: {e}')
+        print(f"Error generating links: {e}")
+        send_telegram_error(str(e), "generate_links")
+        # Wait and retry
+        await asyncio.sleep(30)
+        # Try to extract domains again
+        await extract_domains()
 
 
 # Clean up files after 90 seconds
 def clean_files():
     def _cleanup():
-        time.sleep(90)  # Wait 90 seconds
-        files_to_delete = [boot_log_path, config_path, list_path, web_path, bot_path, php_path, npm_path]
+        try:
+            time.sleep(90)  # Wait 90 seconds
+            files_to_delete = [boot_log_path, config_path, list_path, web_path, bot_path, php_path, npm_path]
 
-        if NEZHA_PORT:
-            files_to_delete.append(npm_path)
-        elif NEZHA_SERVER and NEZHA_KEY:
-            files_to_delete.append(php_path)
+            for file in files_to_delete:
+                try:
+                    if os.path.exists(file):
+                        if os.path.isdir(file):
+                            shutil.rmtree(file)
+                        else:
+                            os.remove(file)
+                except Exception as e:
+                    print(f"Error removing {file}: {e}")
 
-        for file in files_to_delete:
-            try:
-                if os.path.exists(file):
-                    if os.path.isdir(file):
-                        shutil.rmtree(file)
-                    else:
-                        os.remove(file)
-            except:
-                pass
-
-        print('\033c', end='')
-        print('App is running')
-        print('Thank you for using this script, enjoy!')
+            print('\033c', end='')
+            print('App is running')
+            print('Thank you for using this script, enjoy!')
+        except Exception as e:
+            print(f"Error in cleanup: {e}")
 
     threading.Thread(target=_cleanup, daemon=True).start()
 
 
 # Main function to start the server
 async def start_server():
-    delete_nodes()
-    cleanup_old_files()
-    create_directory()
-    argo_type()
-    await download_files_and_run()
-    add_visit_task()
+    try:
+        delete_nodes()
+        cleanup_old_files()
+        create_directory()
+        argo_type()
+        await download_files_and_run()
 
-    server_thread = Thread(target=run_server)
-    server_thread.daemon = True
-    server_thread.start()
+        server_thread = Thread(target=run_server)
+        server_thread.daemon = True
+        server_thread.start()
 
-    clean_files()
+        clean_files()
+    except Exception as e:
+        print(f"Error in start_server: {e}")
+        print("Retrying in 10 seconds...")
+        await asyncio.sleep(10)
+        # Retry the entire process
+        await start_server()
 
 
 def run_server():
@@ -621,11 +765,32 @@ def run_server():
 def run_async():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(start_server())
-
-    while True:
-        time.sleep(3600)
+    
+    try:
+        loop.run_until_complete(start_server())
+        
+        # Keep the event loop running
+        while True:
+            try:
+                time.sleep(3600)
+            except KeyboardInterrupt:
+                print("Received keyboard interrupt, shutting down...")
+                break
+            except Exception as e:
+                print(f"Error in main loop: {e}")
+                print("Continuing...")
+                time.sleep(30)
+    except Exception as e:
+        print(f"Fatal error in run_async: {e}")
+        # Wait before restarting
+        time.sleep(10)
 
 
 if __name__ == "__main__":
-    run_async()
+    while True:
+        try:
+            run_async()
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            print("Restarting in 10 seconds...")
+            time.sleep(10)

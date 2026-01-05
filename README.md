@@ -1,7 +1,9 @@
 # Description
 
-This project is built in a Python environment to deploy **Argo-Xray** nodes, integrating **Nezha probe v0/v1** (free choice).  
+This project is built in a Python environment to deploy **Argo-Xray** nodes.  
 It includes three protocol combinations: **vless-ws-tls / vmess-ws-tls / trojan-ws-tls**.
+
+**Note**: This version automatically downloads required binaries from official sources, eliminating the need for the `lib` directory and significantly reducing repository size.
 
 # Deployment
 
@@ -18,6 +20,7 @@ then run the following commands:
 ```bash
 chmod +x app.py
 pip install -r requirements.txt
+pip install requests
 screen python app.py
 ```
 
@@ -40,10 +43,7 @@ Platforms supporting image deployment are recommended to use this method first.
 | AUTO_ACCESS  | No | false | Whether to enable auto access keep-alive. Set to `true` to enable (requires `PROJECT_URL`) |
 | PORT         | No | 3000 | HTTP service listening port, also used for subscriptions |
 | ARGO_PORT    | No | 8001 | Argo tunnel port, must match the fixed tunnel token in Cloudflare |
-| UUID         | No | 89c13786-25aa-4520-b2e7-12cd60fb5202 | UUID, must be modified when deploying Nezha v1 on different platforms |
-| NEZHA_SERVER | No | — | Nezha panel domain, e.g., v1: nz.aaa.com:8008 or v0: nz.aaa.com |
-| NEZHA_PORT   | No | — | Not used in v1. For v0, if the port is one of {443, 8443, 2096, 2087, 2083, 2053}, TLS will be enabled |
-| NEZHA_KEY    | No | — | Nezha v1 or v0 key |
+| UUID         | No | 40aadc6a-f7c8-4ad4-bff1-90c08f93f571 | UUID for Xray nodes |
 | ARGO_DOMAIN  | No | — | Fixed Argo tunnel domain |
 | ARGO_AUTH    | No | — | Argo fixed tunnel JSON or token |
 | CFIP         | No | time.is | Preferred node domain or IP |
@@ -80,5 +80,5 @@ Please delete it within **24 hours** of downloading.
 All text, data, and images belong to their respective copyright owners.  
 When redistributing, please credit the source.  
 
-By using this program, you agree to comply with all relevant laws and regulations of the **server location**, **host country**, and **user’s country**.  
+By using this program, you agree to comply with all relevant laws and regulations of the **server location**, **host country**, and **user's country**.  
 The author is **not responsible** for any misuse or illegal activity by users.

@@ -1,1 +1,17 @@
 .idea
+
+# Ignore downloaded binaries
+web
+bot
+boot.log
+config.json
+tunnel.json
+tunnel.yml
+sub.txt
+list.txt
+
+# Ignore cache directory
+.cache/
+
+#Ignore cursor AI rules
+/.cursor
